@@ -2,25 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LanternEngine, LANTERNS, sampleLantern } from '../dist/engine.js';
 
-test('three independent lanterns play while the rest queue once in FIFO order', () => {
+test('all nine lanterns respond immediately and finish independently', () => {
   const engine = new LanternEngine();
   const results = LANTERNS.map(l => engine.triggerLantern(l.id));
-  assert.deepEqual(results.map(r => r.status), ['started', 'started', 'started', 'queued', 'queued', 'queued', 'queued', 'queued', 'queued']);
-  assert.equal(engine.triggerLantern('plum').status, 'busy');
-  assert.equal(engine.triggerLantern('lotus').status, 'busy');
-  assert.equal(engine.triggerLantern('unknown').status, 'invalid');
-  engine.update(8.2);
-  assert.deepEqual(engine.getState().active.map(a => a.id), ['koi', 'palace', 'lotus']);
-  assert.deepEqual(engine.getState().queue, ['landscape', 'blossom', 'bamboo', 'ruyi', 'moon']);
-  assert.equal(engine.getState().active.find(a => a.id === 'lotus').age, 0);
-  for (let i = 0; i < 400; i++) {
-    engine.update(0.1);
-    assert.ok(engine.getState().active.length <= 3);
+  assert.ok(results.every(result => result.status === 'started'));
+  assert.equal(engine.getState().active.length, 9);
+  for (const lantern of LANTERNS) {
+    assert.equal(engine.getFrame(lantern.id).age, 0);
+    assert.equal(engine.triggerLantern(lantern.id).status, 'busy');
   }
-  assert.equal(engine.getState().completedCount, 9);
+  assert.equal(engine.triggerLantern('unknown').status, 'invalid');
+  engine.update(7.7);
+  assert.equal(engine.getState().completedCount, 1);
+  assert.equal(engine.getFrame('ruyi'), null);
+  assert.equal(engine.getState().active.length, 8);
+  assert.equal(engine.triggerLantern('ruyi').status, 'started');
+  assert.equal(engine.getState().active.length, 9);
+  assert.equal(engine.getFrame('ruyi').age, 0);
+  assert.equal(engine.getFrame('lotus').age, 7.7);
+  engine.update(10);
+  assert.equal(engine.getState().completedCount, 10);
   assert.equal(engine.getState().active.length, 0);
-  assert.equal(engine.getState().queue.length, 0);
-  assert.equal(engine.triggerLantern('plum').status, 'started');
+  assert.ok(LANTERNS.every(lantern => engine.triggerLantern(lantern.id).status === 'started'));
+  assert.equal(engine.getState().active.length, 9);
 });
 
 test('pause freezes choreography and speed changes affect subsequent time only', () => {
@@ -39,13 +43,14 @@ test('pause freezes choreography and speed changes affect subsequent time only',
   assert.equal(engine.setSpeed(-4), 0.5);
 });
 
-test('long ticks and small ticks consume the same queued choreography', () => {
+test('long ticks and small ticks preserve the same independent choreography', () => {
   const a = new LanternEngine(), b = new LanternEngine();
   LANTERNS.forEach(l => { a.triggerLantern(l.id); b.triggerLantern(l.id); });
-  a.update(17);
-  for (let i = 0; i < 170; i++) b.update(0.1);
+  a.update(8.4);
+  for (let i = 0; i < 84; i++) b.update(0.1);
   const first = a.getState(), second = b.getState();
-  assert.deepEqual(first.queue, second.queue);
+  assert.equal(first.completedCount, 4);
+  assert.equal(first.active.length, 5);
   assert.equal(first.completedCount, second.completedCount);
   assert.deepEqual(first.active.map(v => v.id), second.active.map(v => v.id));
   first.active.forEach((v, i) => assert.ok(Math.abs(v.age - second.active[i].age) < 1e-7));
@@ -82,7 +87,7 @@ test('visible trajectories stay under roof and keep clear of original calligraph
   }
 });
 
-test('reset clears active and queued work without changing chosen speed or pause', () => {
+test('reset clears all nine timelines without changing chosen speed or pause', () => {
   const engine = new LanternEngine();
   LANTERNS.forEach(l => engine.triggerLantern(l.id));
   engine.update(2);
@@ -90,19 +95,20 @@ test('reset clears active and queued work without changing chosen speed or pause
   engine.setSpeed(1.5);
   const state = engine.reset();
   assert.equal(state.active.length, 0);
-  assert.equal(state.queue.length, 0);
   assert.equal(state.elapsed, 0);
   assert.equal(state.paused, true);
   assert.equal(state.speed, 1.5);
   assert.equal(engine.triggerLantern('lotus').status, 'started');
 });
 
-test('state snapshots cannot mutate the running queue or timeline', () => {
+test('state snapshots cannot mutate independent running timelines', () => {
   const engine = new LanternEngine();
-  LANTERNS.slice(0, 4).forEach(l => engine.triggerLantern(l.id));
+  LANTERNS.forEach(l => engine.triggerLantern(l.id));
   const snapshot = engine.getState();
   snapshot.active[0].age = 100;
-  snapshot.queue.length = 0;
+  snapshot.active[0].frame.x = -100;
+  snapshot.active.length = 0;
   assert.equal(engine.getFrame('plum').age, 0);
-  assert.equal(engine.getState().queue.length, 1);
+  assert.equal(engine.getFrame('plum').x, LANTERNS[0].x);
+  assert.equal(engine.getState().active.length, 9);
 });

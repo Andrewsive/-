@@ -49,30 +49,26 @@ export function triggerLantern(id){
     feedback.push({id,at:engine.elapsed,kind:'touch'});
     notify(`${l.name}已唤醒 · ${l.blessing}`);
     $('#live-description').textContent=`${l.name}被轻触唤醒，${l.blessing}。`;
-  }else if(result.status==='queued'){
-    feedback.push({id,at:engine.elapsed,kind:'queue'});
-    notify(`${l.name}已感应 · 稍候，春意将至`);
   }else if(result.status==='busy')notify(`${l.name}正在迎春，待微光归来再轻触`);
   return result;
 }
 window.triggerLantern=triggerLantern;
 window.addEventListener('xixi:sensor',event=>{if(typeof event.detail?.id==='string')triggerLantern(event.detail.id);});
-window.xixiLanterns={triggerLantern,lanterns:LANTERNS,getState:()=>engine.getState(),reset:()=>reset(),setSpeed:n=>engine.setSpeed(n),setPaused:n=>engine.setPaused(n),getDiagnostics:()=>({ready,backgroundClean,fps:Math.round(fps),canvas:[canvas.width,canvas.height],active:engine.active.size,queued:engine.queue.length})};
+window.xixiLanterns={triggerLantern,lanterns:LANTERNS,getState:()=>engine.getState(),reset:()=>reset(),setSpeed:n=>engine.setSpeed(n),setPaused:n=>engine.setPaused(n),getDiagnostics:()=>({ready,backgroundClean,fps:Math.round(fps),canvas:[canvas.width,canvas.height],active:engine.active.size})};
 
 function notify(text){$('#scene-toast').textContent=text;$('#scene-toast').classList.add('visible');toastUntil=performance.now()+2300;}
 function updateInterface(state=engine.getState()){
   const ids=new Set(state.active.map(x=>x.id));
   for(const l of LANTERNS){
-    const status=ids.has(l.id)?'active':state.queue.includes(l.id)?'queued':'idle';
+    const status=ids.has(l.id)?'active':'idle';
     for(const el of [sensorButtons.get(l.id),cards.get(l.id)]){if(!el)continue;el.dataset.state=status;el.setAttribute('aria-busy',String(status!=='idle'));}
     const label=cards.get(l.id)?.querySelector('small');
-    if(label)label.textContent=status==='active'?'微光升起中':status==='queued'?'已感应 · 等待中':l.blessing;
+    if(label)label.textContent=status==='active'?'微光升起中':l.blessing;
   }
   $('#active-count').textContent=state.active.length;
-  $('#queue-label').textContent=state.queue.length?`· ${state.queue.length} 盏静候`:'· 无等待';
-  $('#scene-status').textContent=state.paused?'时光暂驻 · 动画已暂停':state.active.length?`微光升起 · ${state.active.length} 盏灯已唤醒${state.queue.length?` · ${state.queue.length} 盏静候`:''}`:'灯火静候 · 触灯迎春';
+  $('#scene-status').textContent=state.paused?'时光暂驻 · 动画已暂停':state.active.length?`微光升起 · ${state.active.length} 盏灯已唤醒`:'灯火静候 · 触灯迎春';
   $('#pause-button').textContent=state.paused?'继续动画':'暂停动画';
-  if(!state.active.length&&!state.queue.length)$('#live-description').textContent='九盏灯，九种春意。静候你的轻触。';
+  if(!state.active.length)$('#live-description').textContent='九盏灯，九种春意。静候你的轻触。';
 }
 
 function positionSensors(){
@@ -171,7 +167,6 @@ function draw(t){
     if(backgroundClean&&groundAlpha>0){ctx.save();ctx.globalAlpha=groundAlpha;ctx.drawImage(idleSprites.get(l.id),l.x-70,l.y-70,140,140);ctx.restore();}
     if(!a){ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,50,.075+breath*.025);ctx.restore();}
     if(hovered===l.id&&!a){ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,58,.19);ctx.restore();}
-    if(state.queue.includes(l.id)){ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,55,.15+.05*Math.sin(t*3));ctx.restore();}
   }
   for(const a of state.active){
     const l=a.config,f=a.frame;drawSpecial(l,f,t);
@@ -213,7 +208,7 @@ $('#speed').addEventListener('input',e=>{$('#speed-output').textContent=Number(e
 $('#pause-button').addEventListener('click',()=>engine.setPaused(!engine.paused));
 function reset(){engine.reset();feedback.length=0;ambientTime=0;notify('灯火归位 · 春意静候');}
 $('#reset-button').addEventListener('click',reset);
-$('#random-button').addEventListener('click',()=>{const idle=LANTERNS.filter(l=>!engine.active.has(l.id)&&!engine.queue.includes(l.id));if(idle.length)triggerLantern(idle[Math.floor(Math.random()*idle.length)].id);});
+$('#random-button').addEventListener('click',()=>{const idle=LANTERNS.filter(l=>!engine.active.has(l.id));if(idle.length)triggerLantern(idle[Math.floor(Math.random()*idle.length)].id);});
 $('#help-button').addEventListener('click',()=>$('#help-dialog').showModal());
 for(const id of ['close-help','help-start'])$('#'+id).addEventListener('click',()=>$('#help-dialog').close());
 $('#help-dialog').addEventListener('click',e=>{if(e.target===$('#help-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});

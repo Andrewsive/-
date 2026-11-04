@@ -2,9 +2,6 @@
  * Sensor-independent lantern choreography. Coordinates refer to the supplied
  * 1448 × 1086 architectural photograph. All times are seconds; angles radians.
  */
-export const MAX_ACTIVE = 3;
-export const MAX_QUEUE = 6;
-
 const entries = [
   ['plum', '梅枝灯', '春信先归', 160, 806, 8.2, 181, 636, 19, 'petals'],
   ['koi', '锦鲤灯', '年年有余', 294, 805, 8.8, 316, 654, -20, 'fish'],
@@ -78,7 +75,6 @@ export class LanternEngine {
   constructor({ onChange } = {}) {
     this.onChange = typeof onChange === 'function' ? onChange : () => {};
     this.active = new Map();
-    this.queue = [];
     this.paused = false;
     this.speed = 1;
     this.elapsed = 0;
@@ -88,43 +84,30 @@ export class LanternEngine {
 
   triggerLantern(id) {
     if (!byId.has(id)) return { status: 'invalid', id };
-    if (this.active.has(id) || this.queue.includes(id)) return { status: 'busy', id };
-    if (this.active.size < MAX_ACTIVE) {
-      this._start(id);
-      this._notify('started', id);
-      return { status: 'started', id };
-    }
-    if (this.queue.length >= MAX_QUEUE) return { status: 'busy', id };
-    this.queue.push(id);
-    this._notify('queued', id);
-    return { status: 'queued', id };
+    if (this.active.has(id)) return { status: 'busy', id };
+    this._start(id);
+    this._notify('started', id);
+    return { status: 'started', id };
   }
 
   _start(id) {
     this.active.set(id, { id, age: 0, startedAt: this.elapsed, sequence: ++this.sequence });
   }
 
-  /** Consume simulation time exactly, including queue starts within a long tick. */
+  /** Every lantern owns its timeline, with no shared concurrency limit. */
   update(deltaSeconds) {
     if (this.paused || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return this.getState();
-    let remaining = deltaSeconds * this.speed;
+    const step = deltaSeconds * this.speed;
     const before = [...this.active.values()].map(a => `${a.id}:${sampleLantern(a.id, a.age).phase}`).join('|');
     let changed = false;
-    while (remaining > 1e-9) {
-      if (!this.active.size) { this.elapsed += remaining; remaining = 0; break; }
-      const nextEnd = Math.min(...[...this.active.values()].map(a => byId.get(a.id).duration - a.age));
-      const step = Math.max(0, Math.min(remaining, nextEnd));
-      for (const active of this.active.values()) active.age += step;
-      this.elapsed += step;
-      remaining -= step;
-      const finished = [...this.active.values()].filter(a => a.age >= byId.get(a.id).duration - 1e-8);
-      for (const active of finished) {
+    this.elapsed += step;
+    for (const active of this.active.values()) {
+      active.age += step;
+      if (active.age >= byId.get(active.id).duration - 1e-8) {
         this.active.delete(active.id);
         this.completedCount++;
         changed = true;
       }
-      while (this.active.size < MAX_ACTIVE && this.queue.length) this._start(this.queue.shift());
-      if (step === 0 && !finished.length) break;
     }
     const after = [...this.active.values()].map(a => `${a.id}:${sampleLantern(a.id, a.age).phase}`).join('|');
     if (changed || before !== after) this._notify('phase');
@@ -145,7 +128,6 @@ export class LanternEngine {
 
   reset() {
     this.active.clear();
-    this.queue.length = 0;
     this.elapsed = 0;
     this.completedCount = 0;
     this.sequence = 0;
@@ -164,9 +146,8 @@ export class LanternEngine {
         const config = byId.get(active.id);
         return { ...active, duration: config.duration, config, frame: sampleLantern(config, active.age) };
       }),
-      queue: [...this.queue], paused: this.paused, speed: this.speed,
+      paused: this.paused, speed: this.speed,
       elapsed: this.elapsed, completedCount: this.completedCount,
-      maxActive: MAX_ACTIVE,
     };
   }
 

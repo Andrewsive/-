@@ -30,7 +30,7 @@
           <div class="speed-label"><label for="speed">动画速度</label><output id="speed-output">1.0×</output></div><input type="range" min="0.5" max="2" step="0.25" value="1" id="speed"><div class="range-labels"><span>从容 0.5×</span><span>轻快 2×</span></div>
           <div class="panel-actions"><button id="pause-button">暂停动画</button><button id="reset-button">重置花灯</button></div>
           <button class="random-button" id="random-button">随机唤醒一盏 <span>↗</span></button>
-          <div class="panel-foot"><span id="active-count">0</span> / 3 盏正在升起 <span id="queue-label">· 无等待</span></div>
+          <div class="panel-foot"><span id="active-count">0</span> 盏正在升起 · 同时感应不限数量</div>
         </aside>
       </section>
       <section class="lantern-guide" aria-label="选择一盏花灯">
@@ -41,7 +41,7 @@
     <footer><span>01 <b>触灯</b><i>—</i>02 <b>升光</b><i>—</i>03 <b>入画</b></span><p id="live-description" aria-live="polite">九盏灯，九种春意。静候你的轻触。</p><span class="prototype">交互艺术原型 <i>·</i> 2026</span></footer>
   </div>
   <button id="exit-presentation" class="exit-presentation">退出展示 <kbd>Esc</kbd></button>
-  <dialog id="help-dialog"><button id="close-help" class="dialog-close" aria-label="关闭说明">×</button><span class="eyebrow">A SMALL GESTURE, A LITTLE LIGHT</span><h2>触灯，迎一场春。</h2><p>点击白墙下方任意花灯，或点击下方的灯盏名称。花灯会被点亮、沿光迹升起，随后化入画卷。每轮约 8 秒，结束后可再次唤醒。</p><div class="help-steps"><span>01<b>轻触花灯</b><small>鼠标模拟现场感应</small></span><span>02<b>微光升起</b><small>九盏灯各有春意</small></span><span>03<b>融入画卷</b><small>归于宁静，等待下一次</small></span></div><p>支持同时唤醒 3 盏灯。更多触发会依次等待，让灯影疏密有致。演示设置可调整速度、暂停动画、显示感应点。</p><div class="help-keys"><kbd>1–9</kbd> 唤醒对应花灯 <kbd>F</kbd> 全屏 <kbd>空格</kbd> 暂停 <kbd>Esc</kbd> 退出展示</div><small class="help-note">本演示为日常轻互动，不包含集体祈福仪式。真实传感器可接入统一触灯接口。</small><button class="help-start" id="help-start">去唤醒一盏灯 ↗</button></dialog>
+  <dialog id="help-dialog"><button id="close-help" class="dialog-close" aria-label="关闭说明">×</button><span class="eyebrow">A SMALL GESTURE, A LITTLE LIGHT</span><h2>触灯，迎一场春。</h2><p>点击白墙下方任意花灯，或点击下方的灯盏名称。花灯会被点亮、沿光迹升起，随后化入画卷。每轮约 8 秒，结束后可再次唤醒。</p><div class="help-steps"><span>01<b>轻触花灯</b><small>鼠标模拟现场感应</small></span><span>02<b>微光升起</b><small>九盏灯各有春意</small></span><span>03<b>融入画卷</b><small>归于宁静，等待下一次</small></span></div><p>所有花灯均可同时唤醒，每次感应立即响应。同一盏灯归位后可再次触发。演示设置可调整速度、暂停动画、显示感应点。</p><div class="help-keys"><kbd>1–9</kbd> 唤醒对应花灯 <kbd>F</kbd> 全屏 <kbd>空格</kbd> 暂停 <kbd>Esc</kbd> 退出展示</div><small class="help-note">本演示为日常轻互动，不包含集体祈福仪式。真实传感器可接入统一触灯接口。</small><button class="help-start" id="help-start">去唤醒一盏灯 ↗</button></dialog>
   <script type="module" src="./app.js"></script>
 </body>
 </html>
