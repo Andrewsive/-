@@ -14,7 +14,7 @@
       <div class="header-right"><span class="edition">杭州 · 西溪湿地<small>新春光影互动 / 日常篇</small></span><button class="quiet-button" id="help-button" aria-label="查看使用说明">使用说明</button><button class="outline-button" id="fullscreen-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>全屏展示</button></div>
     </header>
     <main>
-      <div class="scene-heading"><div><span class="live-dot"></span><span id="scene-status">灯火静候 · 触灯迎春</span></div><span class="scene-heading-right">一触微光起，一灯一春来 <i></i><button id="settings-button" class="quiet-button" aria-expanded="false" aria-controls="settings-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg>演示设置</button></span></div>
+      <div class="scene-heading"><div><span class="live-dot"></span><span id="scene-status">灯火静候 · 触灯迎春</span></div><span class="scene-heading-right">一触微光起，一灯一春来 <i></i><button id="sample-button" class="quiet-button sample-entry" aria-expanded="false" aria-controls="sample-panel">山水灯样板</button><button id="settings-button" class="quiet-button" aria-expanded="false" aria-controls="settings-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg>演示设置</button></span></div>
       <section class="scene-wrap" aria-label="西溪白墙互动场景">
         <div class="scene" id="scene">
           <canvas id="scene-canvas" width="1448" height="690" aria-label="江南白墙上的宋韵灯影"></canvas>
@@ -31,6 +31,17 @@
           <div class="panel-actions"><button id="pause-button">暂停动画</button><button id="reset-button">重置花灯</button></div>
           <button class="random-button" id="random-button">随机唤醒一盏 <span>↗</span></button>
           <div class="panel-foot"><span id="active-count">0</span> 盏正在升起 · 同时感应不限数量<span id="resonance-count"> · 邻灯共鸣待触发</span></div>
+        </aside>
+        <aside class="sample-panel" id="sample-panel" hidden aria-label="山水灯样板调试模式">
+          <div class="panel-heading"><span>山水灯 · 精修样板<small>只观察这一盏灯的结构与运动</small></span><button class="icon-button" id="close-sample" aria-label="关闭样板调试">×</button></div>
+          <div class="sample-preview-wrap"><canvas id="sample-preview" width="504" height="280" aria-label="山水灯局部放大预览"></canvas><span>局部放大 · 独立灯面分层</span></div>
+          <div class="sample-stage"><span>当前阶段</span><b id="sample-stage">01｜待机</b></div>
+          <button class="sample-replay" id="sample-replay">重播完整动画 <span>↗</span></button>
+          <div class="sample-control-label">速度对比</div><div class="sample-segments"><button data-sample-speed="0.5">0.5× 慢放</button><button class="chosen" data-sample-speed="1">1.0× 正常</button></div>
+          <label class="toggle-row"><span>粒子与流光</span><input type="checkbox" id="sample-effects" role="switch" checked><span class="switch"></span></label>
+          <label class="toggle-row"><span>显示运动轨迹</span><input type="checkbox" id="sample-path" role="switch"><span class="switch"></span></label>
+          <div class="sample-timeline"><span><i>01</i>待机</span><span><i>02</i>唤醒</span><span><i>03</i>升起</span><span><i>04</i>消隐</span></div>
+          <p>关闭粒子与流光后，仍可独立检查灯体路径、光源层次和流苏惯性。</p>
         </aside>
       </section>
       <section class="lantern-guide" aria-label="选择一盏花灯">

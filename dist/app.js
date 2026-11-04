@@ -1,14 +1,16 @@
 import {LANTERNS,LanternEngine,sampleLantern} from './engine.js';
-import {drawLantern} from './lantern-art.js';
+import {drawLantern,drawLandscapeLantern} from './lantern-art.js';
 import {LanternResonance} from './resonance.js';
 
 const $=s=>document.querySelector(s);
 const canvas=$('#scene-canvas'),ctx=canvas.getContext('2d',{alpha:false});
+const samplePreview=$('#sample-preview'),samplePreviewCtx=samplePreview.getContext('2d');
 const scene=$('#scene'),sensors=$('#sensor-layer');
 const W=1448,H=1086,CROP_Y=300,CROP_H=690;
 const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n));
 const ease=n=>{n=clamp(n);return n*n*(3-2*n)};
 let ready=false,backgroundClean=false,ambient=true,presentation=false,hovered=null,lastTime=0,toastUntil=0,uiUntil=0;
+let sampleEffects=true,samplePath=false;
 let ambientTime=0,frameCount=0,fps=60,fpsTime=0;
 const image=new Image(),baseLayer=document.createElement('canvas');
 baseLayer.width=W;baseLayer.height=H;
@@ -100,7 +102,8 @@ function drawAmbient(t){
   ctx.restore();
 }
 function drawReflection(l,frame,t){
-  const strength=(frame?frame.opacity*(.15+frame.glow*.2):.11)*(1+(ambient?Math.sin(t*1.1+l.seed)*.15:0));
+  const reflection=frame?.reflectionOpacity??frame?.opacity??1;
+  const strength=(frame?reflection*(.15+frame.glow*.2):.11)*(1+(ambient?Math.sin(t*1.1+l.seed)*.15:0));
   const x=frame?l.x+(frame.x-l.x)*.2:l.x;
   ctx.save();ctx.globalCompositeOperation='screen';
   for(let i=0;i<8;i++){
@@ -109,6 +112,34 @@ function drawReflection(l,frame,t){
     ctx.beginPath();ctx.moveTo(x-w+wave,y);ctx.quadraticCurveTo(x,y+1.5,x+w+wave,y);ctx.stroke();
   }
   ctx.restore();
+}
+
+function drawLandscapePath(l){
+  ctx.save();ctx.globalCompositeOperation='screen';ctx.setLineDash([4,8]);ctx.strokeStyle='rgba(255,218,145,.3)';ctx.lineWidth=.75;ctx.beginPath();
+  for(let i=0;i<=48;i++){const f=sampleLantern(l,.95+i/48*4.6);if(i)ctx.lineTo(f.x,f.y);else ctx.moveTo(f.x,f.y)}ctx.stroke();ctx.setLineDash([]);
+  for(const age of [.95,2.45,4,5.55]){const f=sampleLantern(l,age);ctx.fillStyle='rgba(255,232,177,.55)';ctx.beginPath();ctx.arc(f.x,f.y,2.1,0,Math.PI*2);ctx.fill()}
+  ctx.restore();
+}
+
+function drawLandscapeEffects(l,f,t){
+  ctx.save();ctx.globalCompositeOperation='screen';
+  if(f.age<1.5){for(let i=0;i<2;i++){const p=clamp((f.age-i*.16)/1.25);if(p>0&&p<1){ctx.strokeStyle=`rgba(255,218,145,${(1-p)*.48})`;ctx.lineWidth=.9;ctx.beginPath();ctx.ellipse(l.x,l.y+27,10+p*55,2+p*9,0,0,Math.PI*2);ctx.stroke()}}}
+  glow(f.x,f.y,52*f.scale,.08*f.externalGlow);
+  if(sampleEffects&&f.trailOpacity>0){
+    for(let k=0;k<2;k++){ctx.beginPath();for(let i=0;i<=20;i++){const age=Math.max(.9,f.age-1.75+i/20*1.75),p=sampleLantern(l,age);const x=p.x+(k?3:-3)*Math.sin(age*1.3),y=p.y+11+k*4;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y)}ctx.strokeStyle=`rgba(255,205,114,${f.trailOpacity*(k?.1:.18)})`;ctx.lineWidth=k?.55:1;ctx.stroke()}
+    for(let i=0;i<5;i++){const age=f.age-i*.18;if(age<1.1)continue;const p=sampleLantern(l,Math.max(.95,age-1));const x=p.x+Math.sin(i*2.4+t*.45)*13,y=p.y+18+i*2;const a=f.particleOpacity*(.22-i*.025);glow(x,y,4,a);ctx.fillStyle=`rgba(255,231,170,${a})`;ctx.beginPath();ctx.arc(x,y,.7+(i%2)*.35,0,Math.PI*2);ctx.fill()}
+  }
+  ctx.restore();
+}
+
+function drawSamplePreview(frame,t){
+  const c=samplePreviewCtx,w=samplePreview.width,h=samplePreview.height;
+  c.clearRect(0,0,w,h);
+  const ground=c.createLinearGradient(0,0,0,h);ground.addColorStop(0,'#302d23');ground.addColorStop(.74,'#201f19');ground.addColorStop(1,'#151612');c.fillStyle=ground;c.fillRect(0,0,w,h);
+  c.strokeStyle='rgba(218,181,110,.08)';c.lineWidth=1;for(let i=0;i<6;i++){c.beginPath();c.moveTo(0,208+i*9);c.quadraticCurveTo(w*.5,202+i*10,w,208+i*9);c.stroke()}
+  c.save();c.globalCompositeOperation='screen';const reflection=c.createRadialGradient(252,224,2,252,224,82);reflection.addColorStop(0,`rgba(255,190,85,${.13*(frame?.reflectionOpacity??1)})`);reflection.addColorStop(1,'rgba(255,164,54,0)');c.fillStyle=reflection;c.fillRect(164,200,176,60);c.restore();
+  const pose=frame||{lightCore:.44,paperLight:.34,patternReveal:1,externalGlow:.38,tasselAngle:Math.sin(t*.45)*.008};
+  drawLandscapeLantern(c,252,130,2.15,pose.rotation||0,pose,t);
 }
 
 function drawSpecial(l,f,t){
@@ -195,10 +226,12 @@ function draw(t){
   ctx.save();ctx.clip(wall,'evenodd');
   if(ambient)drawAmbient(t);
   const state=engine.getState(),active=new Map(state.active.map(a=>[a.id,a]));
+  const landscapeConfig=LANTERNS.find(l=>l.id==='landscape');
+  if(samplePath)drawLandscapePath(landscapeConfig);
   for(const l of LANTERNS){
     const a=active.get(l.id),breath=ambient?Math.sin(t*.95+l.seed):0;
     drawReflection(l,a?.frame,t);
-    const groundAlpha=a?(a.frame.phase==='illuminating'?1:a.frame.returnOpacity):1;
+    const groundAlpha=a?(l.id==='landscape'?a.frame.returnOpacity:(a.frame.phase==='illuminating'?1:a.frame.returnOpacity)):1;
     // Background lamps remain source decoration until a clean plate is ready.
     if(backgroundClean&&groundAlpha>0){ctx.save();ctx.globalAlpha=groundAlpha;ctx.drawImage(idleSprites.get(l.id),l.x-70,l.y-70,140,140);ctx.restore();}
     if(!a){ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,50,.075+breath*.025);ctx.restore();}
@@ -209,11 +242,15 @@ function draw(t){
   const resonanceLabel=$('#resonance-count');if(resonanceLabel)resonanceLabel.textContent=resonances.length?` · ${resonances.length} 组邻灯共鸣`:' · 邻灯共鸣待触发';
   for(const pair of resonances)drawResonance(pair,t);
   for(const a of state.active){
-    const l=a.config,f=a.frame;drawSpecial(l,f,t);
+    const l=a.config,f=a.frame;if(l.id==='landscape')drawLandscapeEffects(l,f,t);else drawSpecial(l,f,t);
     ctx.save();ctx.globalAlpha=f.opacity;
-    drawLantern(ctx,l.type,f.x,f.y,f.scale,f.rotation,1+f.glow,t+a.age);
+    if(l.id==='landscape')drawLandscapeLantern(ctx,f.x,f.y,f.scale,f.rotation,f,t+a.age);else drawLantern(ctx,l.type,f.x,f.y,f.scale,f.rotation,1+f.glow,t+a.age);
     ctx.restore();
   }
+  const sampleFrame=active.get('landscape')?.frame;
+  const stage=$('#sample-stage');if(stage)stage.textContent=!sampleFrame?'01｜待机':sampleFrame.phase==='illuminating'?'02｜唤醒':sampleFrame.phase==='ascending'?'03｜升起':'04｜消隐';
+  canvas.dataset.landscapeAge=sampleFrame?sampleFrame.age.toFixed(2):'idle';canvas.dataset.landscapeStage=sampleFrame?.phase||'idle';
+  drawSamplePreview(sampleFrame,t);
   for(let i=feedback.length-1;i>=0;i--){const item=feedback[i],age=engine.elapsed-item.at;if(age>1.2){feedback.splice(i,1);continue;}const l=LANTERNS.find(l=>l.id===item.id);ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,55+age*15,(1-age/1.2)*.23);ctx.restore();}
   ctx.restore();ctx.restore();
 }
@@ -240,7 +277,7 @@ async function loadScene(){
 }
 function loadImage(url){return new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url;});}
 
-$('#settings-button').addEventListener('click',()=>{const open=$('#settings-panel').hidden;$('#settings-panel').hidden=!open;$('#settings-button').setAttribute('aria-expanded',String(open));});
+$('#settings-button').addEventListener('click',()=>{const open=$('#settings-panel').hidden;$('#sample-panel').hidden=true;$('#sample-button').setAttribute('aria-expanded','false');$('#settings-panel').hidden=!open;$('#settings-button').setAttribute('aria-expanded',String(open));});
 $('#close-settings').addEventListener('click',()=>{$('#settings-panel').hidden=true;$('#settings-button').setAttribute('aria-expanded','false');});
 $('#show-sensors').addEventListener('change',e=>scene.classList.toggle('show-sensors',e.target.checked));
 $('#ambient-toggle').addEventListener('change',e=>ambient=e.target.checked);
@@ -249,6 +286,14 @@ $('#pause-button').addEventListener('click',()=>engine.setPaused(!engine.paused)
 function reset(){engine.reset();resonance.reset();feedback.length=0;ambientTime=0;notify('灯火归位 · 春意静候');}
 $('#reset-button').addEventListener('click',reset);
 $('#random-button').addEventListener('click',()=>{const idle=LANTERNS.filter(l=>!engine.active.has(l.id));if(idle.length)triggerLantern(idle[Math.floor(Math.random()*idle.length)].id);});
+$('#sample-button').addEventListener('click',()=>{const open=$('#sample-panel').hidden;$('#settings-panel').hidden=true;$('#settings-button').setAttribute('aria-expanded','false');$('#sample-panel').hidden=!open;$('#sample-button').setAttribute('aria-expanded',String(open));});
+$('#close-sample').addEventListener('click',()=>{$('#sample-panel').hidden=true;$('#sample-button').setAttribute('aria-expanded','false');});
+$('#sample-replay').addEventListener('click',()=>{engine.restartLantern('landscape');feedback.push({id:'landscape',at:engine.elapsed,kind:'touch'});notify('山水灯样板 · 从唤醒阶段重播');});
+function setSampleSpeed(value){engine.setSpeed(value);$('#speed').value=String(value);$('#speed-output').textContent=value.toFixed(1)+'×';$$sampleSpeed(value)}
+function $$sampleSpeed(value){document.querySelectorAll('[data-sample-speed]').forEach(button=>button.classList.toggle('chosen',Number(button.dataset.sampleSpeed)===value))}
+document.querySelectorAll('[data-sample-speed]').forEach(button=>button.addEventListener('click',()=>setSampleSpeed(Number(button.dataset.sampleSpeed))));
+$('#sample-effects').addEventListener('change',e=>sampleEffects=e.target.checked);
+$('#sample-path').addEventListener('change',e=>samplePath=e.target.checked);
 $('#help-button').addEventListener('click',()=>$('#help-dialog').showModal());
 for(const id of ['close-help','help-start'])$('#'+id).addEventListener('click',()=>$('#help-dialog').close());
 $('#help-dialog').addEventListener('click',e=>{if(e.target===$('#help-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
@@ -256,7 +301,7 @@ $('#help-dialog').addEventListener('click',e=>{if(e.target===$('#help-dialog')){
 function setPresentation(on){presentation=on;document.body.classList.toggle('presentation',on);canvas.height=on?H:CROP_H;positionSensors();wakeUI();}
 function wakeUI(){if(presentation){document.body.classList.add('ui-awake');uiUntil=performance.now()+2200;}}
 async function enterPresentation(){
-  $('#settings-panel').hidden=true;setPresentation(true);
+  $('#settings-panel').hidden=true;$('#sample-panel').hidden=true;setPresentation(true);
   try{if(!document.fullscreenElement&&document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch{/* Embedded previews still support the full-window exhibition view. */}
 }
 async function exitPresentation(){setPresentation(false);if(document.fullscreenElement)try{await document.exitFullscreen();}catch{}}

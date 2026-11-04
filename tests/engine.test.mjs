@@ -49,8 +49,8 @@ test('long ticks and small ticks preserve the same independent choreography', ()
   a.update(8.4);
   for (let i = 0; i < 84; i++) b.update(0.1);
   const first = a.getState(), second = b.getState();
-  assert.equal(first.completedCount, 4);
-  assert.equal(first.active.length, 5);
+  assert.equal(first.completedCount, 5);
+  assert.equal(first.active.length, 4);
   assert.equal(first.completedCount, second.completedCount);
   assert.deepEqual(first.active.map(v => v.id), second.active.map(v => v.id));
   first.active.forEach((v, i) => assert.ok(Math.abs(v.age - second.active[i].age) < 1e-7));
@@ -60,7 +60,7 @@ test('each lantern lights immediately, lifts, dissolves, then restores its sourc
   for (const config of LANTERNS) {
     const initial = sampleLantern(config, 0);
     assert.equal(initial.phase, 'illuminating');
-    assert.ok(initial.glow > 0.65);
+    assert.ok(initial.glow > (config.id === 'landscape' ? 0.3 : 0.65));
     assert.equal(initial.x, config.x);
     assert.equal(initial.y, config.y);
     const flight = sampleLantern(config, config.duration * 0.5);
@@ -111,4 +111,16 @@ test('state snapshots cannot mutate independent running timelines', () => {
   assert.equal(engine.getFrame('plum').age, 0);
   assert.equal(engine.getFrame('plum').x, LANTERNS[0].x);
   assert.equal(engine.getState().active.length, 9);
+});
+
+test('sample replay restarts only the landscape timeline', () => {
+  const engine = new LanternEngine();
+  engine.triggerLantern('landscape');
+  engine.triggerLantern('lotus');
+  engine.update(3);
+  const lotusAge = engine.getFrame('lotus').age;
+  assert.equal(engine.restartLantern('landscape').status, 'started');
+  assert.equal(engine.getFrame('landscape').age, 0);
+  assert.equal(engine.getFrame('lotus').age, lotusAge);
+  assert.equal(engine.getState().active.length, 2);
 });

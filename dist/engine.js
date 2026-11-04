@@ -1,3 +1,5 @@
+import {sampleLandscapeLantern} from './landscape-sample.js';
+
 /**
  * Sensor-independent lantern choreography. Coordinates refer to the supplied
  * 1448 × 1086 architectural photograph. All times are seconds; angles radians.
@@ -7,7 +9,7 @@ const entries = [
   ['koi', '锦鲤灯', '年年有余', 294, 805, 8.8, 316, 654, -20, 'fish'],
   ['palace', '宫灯', '华灯映福', 426, 800, 8.5, 406, 636, 17, 'facets'],
   ['lotus', '莲影灯', '清和如意', 557, 807, 9.2, 575, 650, -19, 'lotus'],
-  ['landscape', '山水灯', '山河长安', 708, 805, 8.9, 682, 642, 12, 'landscape'],
+  ['landscape', '山水灯', '山河长安', 708, 805, 8, 682, 642, 12, 'landscape'],
   ['blossom', '花信灯', '一枝迎春', 833, 808, 7.8, 817, 746, 11, 'petals'],
   ['bamboo', '竹影灯', '节节平安', 953, 807, 8.3, 936, 750, -9, 'wind'],
   ['ruyi', '如意灯', '万事顺遂', 1067, 808, 7.6, 1084, 746, 10, 'ruyi'],
@@ -40,6 +42,7 @@ const cubic = (a, b, c, d, t) => {
 export function sampleLantern(configOrId, age = 0) {
   const config = typeof configOrId === 'string' ? byId.get(configOrId) : configOrId;
   if (!config) return null;
+  if(config.id==='landscape')return sampleLandscapeLantern(config,age);
   const duration = config.duration;
   const time = clamp(Number.isFinite(age) ? age : 0, 0, duration);
   const liftAt = 0.65;
@@ -92,6 +95,14 @@ export class LanternEngine {
 
   _start(id) {
     this.active.set(id, { id, age: 0, startedAt: this.elapsed, sequence: ++this.sequence });
+  }
+
+  restartLantern(id) {
+    if (!byId.has(id)) return { status: 'invalid', id };
+    this.active.delete(id);
+    this._start(id);
+    this._notify('restarted', id);
+    return { status: 'started', id };
   }
 
   /** Every lantern owns its timeline, with no shared concurrency limit. */
