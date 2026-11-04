@@ -1,5 +1,6 @@
 import {LANTERNS,LanternEngine,sampleLantern} from './engine.js';
 import {drawLantern} from './lantern-art.js';
+import {LanternResonance} from './resonance.js';
 
 const $=s=>document.querySelector(s);
 const canvas=$('#scene-canvas'),ctx=canvas.getContext('2d',{alpha:false});
@@ -16,6 +17,7 @@ const base=baseLayer.getContext('2d');
 // The second subpath reserves the original calligraphy, even during dispersal.
 const wall=new Path2D('M 4 583 L 975 587 L 975 562 L 1039 565 L 1038 510 L 1110 513 L 1112 450 L 1245 450 L 1243 510 L 1320 513 L 1321 548 L 1368 552 L 1390 841 L 4 841 Z M 766 602 L 1310 602 L 1310 694 L 766 694 Z');
 const engine=new LanternEngine({onChange:updateInterface});
+const resonance=new LanternResonance();
 const sensorButtons=new Map(),cards=new Map(),feedback=[];
 const idleSprites=new Map();
 
@@ -54,7 +56,7 @@ export function triggerLantern(id){
 }
 window.triggerLantern=triggerLantern;
 window.addEventListener('xixi:sensor',event=>{if(typeof event.detail?.id==='string')triggerLantern(event.detail.id);});
-window.xixiLanterns={triggerLantern,lanterns:LANTERNS,getState:()=>engine.getState(),reset:()=>reset(),setSpeed:n=>engine.setSpeed(n),setPaused:n=>engine.setPaused(n),getDiagnostics:()=>({ready,backgroundClean,fps:Math.round(fps),canvas:[canvas.width,canvas.height],active:engine.active.size})};
+window.xixiLanterns={triggerLantern,lanterns:LANTERNS,getState:()=>engine.getState(),reset:()=>reset(),setSpeed:n=>engine.setSpeed(n),setPaused:n=>engine.setPaused(n),getDiagnostics:()=>({ready,backgroundClean,fps:Math.round(fps),canvas:[canvas.width,canvas.height],active:engine.active.size,resonances:Number(canvas.dataset.resonances)||0})};
 
 function notify(text){$('#scene-toast').textContent=text;$('#scene-toast').classList.add('visible');toastUntil=performance.now()+2300;}
 function updateInterface(state=engine.getState()){
@@ -153,6 +155,40 @@ function drawSpecial(l,f,t){
   ctx.restore();
 }
 
+function drawResonance(pair,t){
+  const a=pair.left,b=pair.right,s=pair.strength;
+  const mx=(a.x+b.x)/2,my=(a.y+b.y)/2-18-Math.sin(pair.age*2.1+pair.seed)*8;
+  ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=s;
+  // A restrained three-layer ribbon makes the two independent paths feel connected.
+  for(let i=0;i<3;i++){
+    const offset=(i-1)*5,wave=Math.sin(pair.age*3+i+pair.seed)*4;
+    ctx.beginPath();ctx.moveTo(a.x,a.y+offset);
+    ctx.quadraticCurveTo(mx,my+wave,b.x,b.y-offset);
+    ctx.strokeStyle=i===1?'rgba(255,235,176,.9)':'rgba(255,178,61,.34)';ctx.lineWidth=i===1?1.65:5.2;ctx.stroke();
+  }
+  for(let i=0;i<7;i++){
+    const p=(pair.age*.28+i/7)%1,q=1-p;
+    const x=q*q*a.x+2*q*p*mx+p*p*b.x,y=q*q*a.y+2*q*p*my+p*p*b.y;
+    const pulse=.65+.35*Math.sin(pair.age*5+i);
+    glow(x,y,10+i%2*4,.28*pulse*s);
+    ctx.fillStyle=`rgba(255,244,201,${.65*pulse})`;ctx.beginPath();ctx.arc(x,y,1.3+(i%3)*.45,0,Math.PI*2);ctx.fill();
+  }
+  glow(mx,my,34,.28*s);
+  if(pair.mode==='blossom'){
+    for(let i=0;i<7;i++)petal(mx+Math.cos(i*2.1+t)*24,my+Math.sin(i*1.7+t)*14,4.2,i+t,.62*s);
+  }else if(pair.mode==='water'){
+    for(let i=0;i<3;i++){ctx.strokeStyle=`rgba(255,220,142,${(.42-i*.1)*s})`;ctx.lineWidth=.8;ctx.beginPath();ctx.ellipse(mx,my+15+i*6,20+i*15,3+i,0,0,Math.PI*2);ctx.stroke();}
+    ctx.save();ctx.translate(mx+Math.sin(t*1.7)*12,my-2);ctx.rotate(Math.sin(t)*.2);ctx.strokeStyle='rgba(255,239,186,.68)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-9,0);ctx.quadraticCurveTo(0,-6,9,0);ctx.quadraticCurveTo(0,6,-9,0);ctx.lineTo(-13,-4);ctx.moveTo(-9,0);ctx.lineTo(-13,4);ctx.stroke();ctx.restore();
+  }else if(pair.mode==='moon'){
+    ctx.strokeStyle='rgba(255,241,199,.58)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(mx,my,16,Math.PI*.2,Math.PI*1.72);ctx.stroke();ctx.beginPath();ctx.arc(mx+7,my-4,13,Math.PI*.65,Math.PI*1.5);ctx.stroke();
+  }else if(pair.mode==='wind'){
+    for(let i=0;i<3;i++){const yy=my-8+i*8;stroke(`M ${mx-25-i*4} ${yy} Q ${mx} ${yy-9+Math.sin(t+i)*3} ${mx+27+i*5} ${yy-2}`,'rgba(255,228,166,.48)',.8);}
+  }else{
+    ctx.strokeStyle='rgba(255,219,135,.52)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(mx-8,my,9,0,Math.PI*1.6);ctx.arc(mx+8,my,9,Math.PI,Math.PI*2.6);ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function draw(t){
   ctx.fillStyle='#0d100e';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.save();ctx.translate(0,presentation?0:-CROP_Y);ctx.drawImage(baseLayer,0,0);
@@ -168,6 +204,10 @@ function draw(t){
     if(!a){ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,50,.075+breath*.025);ctx.restore();}
     if(hovered===l.id&&!a){ctx.save();ctx.globalCompositeOperation='screen';glow(l.x,l.y,58,.19);ctx.restore();}
   }
+  const resonances=resonance.sample(state);
+  canvas.dataset.resonances=String(resonances.length);
+  const resonanceLabel=$('#resonance-count');if(resonanceLabel)resonanceLabel.textContent=resonances.length?` · ${resonances.length} 组邻灯共鸣`:' · 邻灯共鸣待触发';
+  for(const pair of resonances)drawResonance(pair,t);
   for(const a of state.active){
     const l=a.config,f=a.frame;drawSpecial(l,f,t);
     ctx.save();ctx.globalAlpha=f.opacity;
@@ -206,7 +246,7 @@ $('#show-sensors').addEventListener('change',e=>scene.classList.toggle('show-sen
 $('#ambient-toggle').addEventListener('change',e=>ambient=e.target.checked);
 $('#speed').addEventListener('input',e=>{$('#speed-output').textContent=Number(e.target.value).toFixed(2).replace(/0$/,'')+'×';engine.setSpeed(Number(e.target.value));});
 $('#pause-button').addEventListener('click',()=>engine.setPaused(!engine.paused));
-function reset(){engine.reset();feedback.length=0;ambientTime=0;notify('灯火归位 · 春意静候');}
+function reset(){engine.reset();resonance.reset();feedback.length=0;ambientTime=0;notify('灯火归位 · 春意静候');}
 $('#reset-button').addEventListener('click',reset);
 $('#random-button').addEventListener('click',()=>{const idle=LANTERNS.filter(l=>!engine.active.has(l.id));if(idle.length)triggerLantern(idle[Math.floor(Math.random()*idle.length)].id);});
 $('#help-button').addEventListener('click',()=>$('#help-dialog').showModal());
